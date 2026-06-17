@@ -2,6 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>ぷよぷよ</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -9,17 +10,56 @@
     body {
       background: #1a1a2e;
       display: flex;
-      justify-content: center;
+      flex-direction: column;
+      justify-content: flex-start;
       align-items: center;
       min-height: 100vh;
+      min-height: 100dvh;
       font-family: 'Segoe UI', sans-serif;
       color: #fff;
+      overflow: hidden;
+      touch-action: none;
     }
 
-    #wrapper {
+    /* ===== TOP BAR ===== */
+    #topbar {
+      width: 100%;
       display: flex;
-      gap: 24px;
-      align-items: flex-start;
+      justify-content: space-around;
+      align-items: center;
+      padding: 6px 8px;
+      background: #16213e;
+      border-bottom: 2px solid #4a4a8a;
+      flex-shrink: 0;
+    }
+
+    .panel {
+      text-align: center;
+    }
+    .panel h3 {
+      font-size: 10px;
+      color: #8888cc;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+    .panel .value {
+      font-size: 22px;
+      font-weight: bold;
+    }
+
+    #nextCanvas {
+      background: #0d0d1a;
+      border-radius: 4px;
+      display: block;
+    }
+
+    /* ===== GAME AREA ===== */
+    #gameArea {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex: 1;
+      padding: 4px 0;
     }
 
     #gameCanvas {
@@ -29,108 +69,108 @@
       background: #0d0d1a;
     }
 
-    #sidebar {
-      width: 130px;
-      display: flex;
-      flex-direction: column;
-      gap: 20px;
-    }
-
-    .panel {
+    /* ===== TOUCH CONTROLS ===== */
+    #controls {
+      width: 100%;
+      flex-shrink: 0;
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr 1fr 1fr;
+      gap: 6px;
+      padding: 6px 10px 10px;
       background: #16213e;
+      border-top: 2px solid #4a4a8a;
+    }
+
+    .btn {
+      background: #2a2a5a;
       border: 2px solid #4a4a8a;
-      border-radius: 8px;
-      padding: 12px;
-      text-align: center;
-    }
-
-    .panel h3 {
-      font-size: 12px;
-      color: #8888cc;
-      letter-spacing: 1px;
-      margin-bottom: 8px;
-      text-transform: uppercase;
-    }
-
-    .panel .value {
-      font-size: 28px;
-      font-weight: bold;
+      border-radius: 10px;
       color: #fff;
+      font-size: 22px;
+      padding: 14px 0;
+      cursor: pointer;
+      user-select: none;
+      -webkit-user-select: none;
+      text-align: center;
+      transition: background 0.1s, transform 0.1s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn:active, .btn.pressed {
+      background: #5555aa;
+      transform: scale(0.93);
+    }
+    .btn.drop {
+      grid-column: span 2;
+      font-size: 16px;
+      font-weight: bold;
+      background: #3a2a6a;
+    }
+    .btn.drop:active, .btn.drop.pressed {
+      background: #6655bb;
     }
 
-    #nextCanvas {
-      background: #0d0d1a;
-      border-radius: 4px;
-    }
-
+    /* ===== MESSAGE OVERLAY ===== */
     #message {
       position: fixed;
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
-      background: rgba(0,0,0,0.85);
+      background: rgba(0,0,0,0.9);
       border: 2px solid #6666cc;
       border-radius: 12px;
-      padding: 32px 40px;
+      padding: 28px 36px;
       text-align: center;
       display: none;
       z-index: 10;
+      min-width: 220px;
     }
-
-    #message h2 { font-size: 28px; margin-bottom: 12px; }
-    #message p  { color: #aaa; margin-bottom: 20px; }
-
+    #message h2 { font-size: 26px; margin-bottom: 10px; }
+    #message p  { color: #aaa; margin-bottom: 18px; font-size: 15px; }
     #message button {
       background: #4444aa;
       color: #fff;
       border: none;
-      padding: 10px 28px;
-      border-radius: 6px;
-      font-size: 16px;
-      cursor: pointer;
-      transition: background 0.2s;
-    }
-    #message button:hover { background: #6666cc; }
-
-    #controls {
-      background: #16213e;
-      border: 2px solid #4a4a8a;
+      padding: 12px 32px;
       border-radius: 8px;
-      padding: 12px;
-      font-size: 11px;
-      color: #8888cc;
-      line-height: 1.9;
+      font-size: 17px;
+      cursor: pointer;
     }
-    #controls strong { color: #aaaaee; }
   </style>
 </head>
 <body>
 
-<div id="wrapper">
-  <canvas id="gameCanvas"></canvas>
-
-  <div id="sidebar">
-    <div class="panel">
-      <h3>SCORE</h3>
-      <div class="value" id="scoreDisplay">0</div>
-    </div>
-    <div class="panel">
-      <h3>NEXT</h3>
-      <canvas id="nextCanvas" width="80" height="80"></canvas>
-    </div>
-    <div class="panel">
-      <h3>CHAIN</h3>
-      <div class="value" id="chainDisplay">0</div>
-    </div>
-    <div id="controls">
-      <strong>←→</strong> 移動<br>
-      <strong>↑ / Z</strong> 回転<br>
-      <strong>↓</strong> 高速落下<br>
-      <strong>Space</strong> 即落とし
-    </div>
+<!-- TOP HUD -->
+<div id="topbar">
+  <div class="panel">
+    <h3>SCORE</h3>
+    <div class="value" id="scoreDisplay">0</div>
+  </div>
+  <div class="panel">
+    <h3>NEXT</h3>
+    <canvas id="nextCanvas" width="60" height="60"></canvas>
+  </div>
+  <div class="panel">
+    <h3>CHAIN</h3>
+    <div class="value" id="chainDisplay">0</div>
   </div>
 </div>
 
+<!-- GAME CANVAS -->
+<div id="gameArea">
+  <canvas id="gameCanvas"></canvas>
+</div>
+
+<!-- TOUCH BUTTONS -->
+<div id="controls">
+  <button class="btn" id="btnLeft"  ontouchstart="onBtnDown('left')"  ontouchend="onBtnUp('left')">◀</button>
+  <button class="btn" id="btnRotL" ontouchstart="onBtnDown('rotL')"  ontouchend="onBtnUp('rotL')">↺</button>
+  <button class="btn" id="btnRotR" ontouchstart="onBtnDown('rotR')"  ontouchend="onBtnUp('rotR')">↻</button>
+  <button class="btn" id="btnRight" ontouchstart="onBtnDown('right')" ontouchend="onBtnUp('right')">▶</button>
+  <button class="btn" id="btnDown"  ontouchstart="onBtnDown('down')"  ontouchend="onBtnUp('down')">▼</button>
+  <button class="btn drop" id="btnDrop" ontouchstart="onBtnDown('drop')" ontouchend="onBtnUp('drop')">DROP ↓↓</button>
+</div>
+
+<!-- GAME OVER / START -->
 <div id="message">
   <h2 id="msgTitle">ゲームオーバー</h2>
   <p id="msgSub">スコア: <span id="finalScore">0</span></p>
@@ -143,50 +183,53 @@
 // ============================
 const COLS = 6;
 const ROWS = 13;
-const CELL = 40;
-
-const COLORS = ['#e74c3c','#3498db','#2ecc71','#f39c12','#9b59b6'];
-const COLOR_NAMES = ['赤','青','緑','黄','紫'];
 const EMPTY = -1;
+const COLORS = ['#e74c3c','#3498db','#2ecc71','#f39c12','#9b59b6'];
 
-const canvas = document.getElementById('gameCanvas');
-canvas.width  = COLS * CELL;
-canvas.height = ROWS * CELL;
-const ctx = canvas.getContext('2d');
+const canvas  = document.getElementById('gameCanvas');
+const ctx     = canvas.getContext('2d');
+const nextCvs = document.getElementById('nextCanvas');
+const nCtx    = nextCvs.getContext('2d');
 
-const nextCanvas = document.getElementById('nextCanvas');
-const nCtx = nextCanvas.getContext('2d');
+// セルサイズをスクリーンに合わせて計算
+function calcCell() {
+  const topH  = document.getElementById('topbar').offsetHeight || 54;
+  const ctrlH = document.getElementById('controls').offsetHeight || 110;
+  const availH = window.innerHeight - topH - ctrlH - 16;
+  const availW = window.innerWidth - 8;
+  return Math.floor(Math.min(availW / COLS, availH / ROWS));
+}
+
+let CELL = 32;
+
+function resizeCanvas() {
+  CELL = calcCell();
+  canvas.width  = COLS * CELL;
+  canvas.height = ROWS * CELL;
+  draw();
+}
 
 // ============================
 // ゲーム状態
 // ============================
 let board, score, chain, gameOver, dropInterval, currentPair, nextPair, lastTime, accumulator;
 
-// ペアぷよの構造:
-//   { pivot: {r, c, color}, satellite: {r, c, color} }
-//   satellite は pivot の上・右・下・左のどれか（回転で変わる）
-
 function randomColor() { return Math.floor(Math.random() * COLORS.length); }
 
 function newPair() {
   return {
-    pivot:     { r: 1, c: Math.floor(COLS/2) - 1, color: randomColor() },
-    satellite: { r: 0, c: Math.floor(COLS/2) - 1, color: randomColor() },
+    pivot:     { r: 1, c: Math.floor(COLS/2)-1, color: randomColor() },
+    satellite: { r: 0, c: Math.floor(COLS/2)-1, color: randomColor() },
   };
 }
 
 function startGame() {
+  resizeCanvas();
   board = Array.from({length: ROWS}, () => new Array(COLS).fill(EMPTY));
-  score = 0;
-  chain = 0;
-  gameOver = false;
-  dropInterval = 800;
-  accumulator = 0;
-  lastTime = null;
-
+  score = 0; chain = 0; gameOver = false;
+  dropInterval = 800; accumulator = 0; lastTime = null;
   currentPair = newPair();
   nextPair    = newPair();
-
   document.getElementById('message').style.display = 'none';
   updateHUD();
   requestAnimationFrame(gameLoop);
@@ -197,20 +240,14 @@ function startGame() {
 // ============================
 function gameLoop(timestamp) {
   if (gameOver) return;
-
   if (lastTime === null) lastTime = timestamp;
   const dt = timestamp - lastTime;
   lastTime = timestamp;
-
   accumulator += dt;
   if (accumulator >= dropInterval) {
     accumulator = 0;
-    if (!movePair(1, 0)) {
-      placePair();
-      return; // placePair が非同期チェーン処理を開始する
-    }
+    if (!movePair(1, 0)) { placePair(); return; }
   }
-
   draw();
   requestAnimationFrame(gameLoop);
 }
@@ -226,30 +263,23 @@ function movePair(dr, dc) {
 
 function offsetPair(pair, dr, dc) {
   return {
-    pivot:     { ...pair.pivot,     r: pair.pivot.r     + dr, c: pair.pivot.c     + dc },
-    satellite: { ...pair.satellite, r: pair.satellite.r + dr, c: pair.satellite.c + dc },
+    pivot:     { ...pair.pivot,     r: pair.pivot.r+dr,     c: pair.pivot.c+dc },
+    satellite: { ...pair.satellite, r: pair.satellite.r+dr, c: pair.satellite.c+dc },
   };
 }
 
-function rotatePair() {
-  // satellite の pivot 相対位置を時計回りに90°回転
+function rotatePair(clockwise = true) {
   const dr = currentPair.satellite.r - currentPair.pivot.r;
   const dc = currentPair.satellite.c - currentPair.pivot.c;
-  // (dr, dc) -> (-dc, dr)  ※時計回り
-  const newDr = dc;   // ←これで反時計回り
-  const newDc = -dr;
+  const newDr = clockwise ?  dc : -dc;
+  const newDc = clockwise ? -dr :  dr;
   const np = {
     pivot: { ...currentPair.pivot },
-    satellite: {
-      r: currentPair.pivot.r + newDr,
-      c: currentPair.pivot.c + newDc,
-      color: currentPair.satellite.color,
-    },
+    satellite: { r: currentPair.pivot.r+newDr, c: currentPair.pivot.c+newDc, color: currentPair.satellite.color },
   };
-  // 壁キック
   if (!isValid(np)) {
     const kicked = offsetPair(np, 0, np.satellite.c < 0 ? 1 : -1);
-    if (isValid(kicked)) { currentPair = kicked; } 
+    if (isValid(kicked)) currentPair = kicked;
   } else {
     currentPair = np;
   }
@@ -263,24 +293,21 @@ function hardDrop() {
 
 function isValid(pair) {
   for (const p of [pair.pivot, pair.satellite]) {
-    if (p.c < 0 || p.c >= COLS) return false;
-    if (p.r >= ROWS) return false;
+    if (p.c < 0 || p.c >= COLS || p.r >= ROWS) return false;
     if (p.r >= 0 && board[p.r][p.c] !== EMPTY) return false;
   }
   return true;
 }
 
 // ============================
-// 設置
+// 設置・連鎖
 // ============================
 function placePair() {
   for (const p of [currentPair.pivot, currentPair.satellite]) {
     if (p.r < 0) { triggerGameOver(); return; }
     board[p.r][p.c] = p.color;
   }
-  chain = 0;
-  draw();
-  processChain();
+  chain = 0; draw(); processChain();
 }
 
 function triggerGameOver() {
@@ -290,227 +317,132 @@ function triggerGameOver() {
   document.getElementById('message').style.display = 'block';
 }
 
-// ============================
-// 連鎖処理（非同期・アニメーション付き）
-// ============================
 async function processChain() {
   await applyGravity();
-
   const groups = findGroups();
-  if (groups.length === 0) {
-    // 連鎖終了
-    spawnNext();
-    return;
-  }
-
+  if (groups.length === 0) { spawnNext(); return; }
   chain++;
   const cleared = groups.flat();
-  const bonus = calcBonus(cleared.length, chain);
-  score += bonus;
+  score += calcBonus(cleared.length, chain);
   updateHUD();
-
-  // 消去アニメーション
   await flashCells(cleared);
-
-  // 消去
-  for (const {r, c} of cleared) board[r][c] = EMPTY;
+  for (const {r,c} of cleared) board[r][c] = EMPTY;
   draw();
-
-  // 落下
   await applyGravity();
-
-  // 再帰
   setTimeout(processChain, 200);
 }
 
 function spawnNext() {
   currentPair = nextPair;
   nextPair = newPair();
-  accumulator = 0;
-  lastTime = null;
+  accumulator = 0; lastTime = null;
   draw();
   requestAnimationFrame(gameLoop);
 }
 
 async function applyGravity() {
-  // 各列で上から詰める
   let changed = true;
   while (changed) {
     changed = false;
     for (let c = 0; c < COLS; c++) {
-      for (let r = ROWS - 2; r >= 0; r--) {
+      for (let r = ROWS-2; r >= 0; r--) {
         if (board[r][c] !== EMPTY && board[r+1][c] === EMPTY) {
-          board[r+1][c] = board[r][c];
-          board[r][c] = EMPTY;
-          changed = true;
+          board[r+1][c] = board[r][c]; board[r][c] = EMPTY; changed = true;
         }
       }
     }
   }
-  draw();
-  await wait(100);
+  draw(); await wait(100);
 }
 
 function findGroups() {
-  const visited = Array.from({length: ROWS}, () => new Array(COLS).fill(false));
+  const visited = Array.from({length:ROWS},()=>new Array(COLS).fill(false));
   const groups = [];
-
-  for (let r = 0; r < ROWS; r++) {
-    for (let c = 0; c < COLS; c++) {
-      if (board[r][c] !== EMPTY && !visited[r][c]) {
-        const group = [];
-        floodFill(r, c, board[r][c], visited, group);
-        if (group.length >= 4) groups.push(group);
-      }
+  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+    if (board[r][c] !== EMPTY && !visited[r][c]) {
+      const group = [];
+      floodFill(r, c, board[r][c], visited, group);
+      if (group.length >= 4) groups.push(group);
     }
   }
   return groups;
 }
 
 function floodFill(r, c, color, visited, group) {
-  if (r < 0 || r >= ROWS || c < 0 || c >= COLS) return;
-  if (visited[r][c] || board[r][c] !== color) return;
-  visited[r][c] = true;
-  group.push({r, c});
-  floodFill(r-1, c, color, visited, group);
-  floodFill(r+1, c, color, visited, group);
-  floodFill(r, c-1, color, visited, group);
-  floodFill(r, c+1, color, visited, group);
+  if (r<0||r>=ROWS||c<0||c>=COLS||visited[r][c]||board[r][c]!==color) return;
+  visited[r][c]=true; group.push({r,c});
+  floodFill(r-1,c,color,visited,group); floodFill(r+1,c,color,visited,group);
+  floodFill(r,c-1,color,visited,group); floodFill(r,c+1,color,visited,group);
 }
 
 function calcBonus(count, chainNum) {
-  const base = count * 10;
-  const chainBonus = Math.max(1, chainNum * 3);
-  return base * chainBonus;
+  return count * 10 * Math.max(1, chainNum * 3);
 }
 
-// ============================
-// アニメーション補助
-// ============================
 async function flashCells(cells) {
-  for (let i = 0; i < 4; i++) {
-    drawFlash(cells, i % 2 === 0);
-    await wait(80);
-  }
+  for (let i=0;i<4;i++) { drawFlash(cells, i%2===0); await wait(80); }
 }
-
 function drawFlash(cells, bright) {
   draw();
-  for (const {r, c} of cells) {
+  for (const {r,c} of cells) {
     ctx.fillStyle = bright ? '#ffffff' : 'rgba(255,255,255,0.3)';
-    ctx.fillRect(c * CELL + 2, r * CELL + 2, CELL - 4, CELL - 4);
+    ctx.fillRect(c*CELL+2, r*CELL+2, CELL-4, CELL-4);
   }
 }
-
-function wait(ms) { return new Promise(res => setTimeout(res, ms)); }
+function wait(ms) { return new Promise(res=>setTimeout(res,ms)); }
 
 // ============================
 // 描画
 // ============================
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-  // グリッド線
-  ctx.strokeStyle = '#1e1e3a';
-  ctx.lineWidth = 1;
-  for (let r = 0; r <= ROWS; r++) {
-    ctx.beginPath(); ctx.moveTo(0, r*CELL); ctx.lineTo(COLS*CELL, r*CELL); ctx.stroke();
-  }
-  for (let c = 0; c <= COLS; c++) {
-    ctx.beginPath(); ctx.moveTo(c*CELL, 0); ctx.lineTo(c*CELL, ROWS*CELL); ctx.stroke();
-  }
-
-  // ボード
-  for (let r = 0; r < ROWS; r++) {
-    for (let c = 0; c < COLS; c++) {
-      if (board[r][c] !== EMPTY) drawPuyo(ctx, r, c, board[r][c]);
-    }
-  }
-
-  // 現在のペア
+  ctx.strokeStyle = '#1e1e3a'; ctx.lineWidth = 1;
+  for (let r=0;r<=ROWS;r++){ctx.beginPath();ctx.moveTo(0,r*CELL);ctx.lineTo(COLS*CELL,r*CELL);ctx.stroke();}
+  for (let c=0;c<=COLS;c++){ctx.beginPath();ctx.moveTo(c*CELL,0);ctx.lineTo(c*CELL,ROWS*CELL);ctx.stroke();}
+  for (let r=0;r<ROWS;r++) for (let c=0;c<COLS;c++) if (board[r][c]!==EMPTY) drawPuyo(ctx,r,c,board[r][c],CELL);
   if (currentPair && !gameOver) {
-    for (const p of [currentPair.pivot, currentPair.satellite]) {
-      if (p.r >= 0) drawPuyo(ctx, p.r, p.c, p.color);
-    }
-    // ゴースト（落下先）
     drawGhost();
+    for (const p of [currentPair.pivot, currentPair.satellite]) if (p.r>=0) drawPuyo(ctx,p.r,p.c,p.color,CELL);
   }
-
-  // NEXTキャンバス
-  nCtx.clearRect(0, 0, 80, 80);
+  // NEXT
+  const ns = 30;
+  nCtx.clearRect(0,0,60,60);
   if (nextPair) {
-    drawPuyoOnCtx(nCtx, 0, 0, nextPair.satellite.color, 40);
-    drawPuyoOnCtx(nCtx, 1, 0, nextPair.pivot.color, 40);
+    drawPuyo(nCtx,0,0,nextPair.satellite.color,ns);
+    drawPuyo(nCtx,1,0,nextPair.pivot.color,ns);
   }
 }
 
 function drawGhost() {
-  let ghost = {...currentPair,
-    pivot: {...currentPair.pivot},
-    satellite: {...currentPair.satellite}
-  };
-  while (true) {
-    const next = offsetPair(ghost, 1, 0);
-    if (!isValid(next)) break;
-    ghost = next;
-  }
-  for (const p of [ghost.pivot, ghost.satellite]) {
-    if (p.r >= 0) {
-      ctx.save();
-      ctx.globalAlpha = 0.25;
-      drawPuyo(ctx, p.r, p.c, p.color);
-      ctx.restore();
-    }
-  }
-}
-
-function drawPuyo(ctx, r, c, colorIdx) {
-  drawPuyoOnCtx(ctx, r, c, colorIdx, CELL);
-}
-
-function drawPuyoOnCtx(ctx, r, c, colorIdx, size) {
-  const x = c * size + size * 0.1;
-  const y = r * size + size * 0.1;
-  const s = size * 0.8;
-  const rad = s / 2;
-
-  const color = COLORS[colorIdx];
-
-  // 影
-  ctx.save();
-  ctx.shadowColor = color;
-  ctx.shadowBlur = 8;
-
-  // 本体（円）
-  ctx.beginPath();
-  ctx.arc(x + rad, y + rad, rad, 0, Math.PI * 2);
-  const grad = ctx.createRadialGradient(x+rad*0.6, y+rad*0.5, 1, x+rad, y+rad, rad);
-  grad.addColorStop(0, lighten(color, 60));
-  grad.addColorStop(1, color);
-  ctx.fillStyle = grad;
-  ctx.fill();
-
-  // ハイライト
-  ctx.beginPath();
-  ctx.arc(x + rad * 0.65, y + rad * 0.5, rad * 0.25, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(255,255,255,0.5)';
-  ctx.fill();
-
-  // 目
-  const eyeY = y + rad * 0.85;
-  ctx.fillStyle = '#222';
-  ctx.beginPath(); ctx.arc(x + rad * 0.72, eyeY, rad * 0.13, 0, Math.PI * 2); ctx.fill();
-  ctx.beginPath(); ctx.arc(x + rad * 1.28, eyeY, rad * 0.13, 0, Math.PI * 2); ctx.fill();
-
+  let g = {pivot:{...currentPair.pivot}, satellite:{...currentPair.satellite}};
+  while (true) { const n=offsetPair(g,1,0); if(!isValid(n))break; g=n; }
+  ctx.save(); ctx.globalAlpha=0.22;
+  for (const p of [g.pivot,g.satellite]) if(p.r>=0) drawPuyo(ctx,p.r,p.c,p.color,CELL);
   ctx.restore();
 }
 
-function lighten(hex, amount) {
-  const num = parseInt(hex.slice(1), 16);
-  const r = Math.min(255, (num >> 16) + amount);
-  const g = Math.min(255, ((num >> 8) & 0xff) + amount);
-  const b = Math.min(255, (num & 0xff) + amount);
-  return `rgb(${r},${g},${b})`;
+function drawPuyo(ctx, r, c, colorIdx, size) {
+  const x = c*size + size*0.1, y = r*size + size*0.1;
+  const rad = size*0.8/2;
+  const color = COLORS[colorIdx];
+  ctx.save();
+  ctx.shadowColor = color; ctx.shadowBlur = 6;
+  ctx.beginPath(); ctx.arc(x+rad, y+rad, rad, 0, Math.PI*2);
+  const g = ctx.createRadialGradient(x+rad*0.6,y+rad*0.5,1,x+rad,y+rad,rad);
+  g.addColorStop(0, lighten(color,60)); g.addColorStop(1, color);
+  ctx.fillStyle = g; ctx.fill();
+  ctx.beginPath(); ctx.arc(x+rad*0.65,y+rad*0.5,rad*0.25,0,Math.PI*2);
+  ctx.fillStyle='rgba(255,255,255,0.5)'; ctx.fill();
+  const ey = y+rad*0.85;
+  ctx.fillStyle='#222';
+  ctx.beginPath();ctx.arc(x+rad*0.72,ey,rad*0.13,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.arc(x+rad*1.28,ey,rad*0.13,0,Math.PI*2);ctx.fill();
+  ctx.restore();
+}
+
+function lighten(hex, a) {
+  const n=parseInt(hex.slice(1),16);
+  return `rgb(${Math.min(255,(n>>16)+a)},${Math.min(255,((n>>8)&0xff)+a)},${Math.min(255,(n&0xff)+a)})`;
 }
 
 function updateHUD() {
@@ -519,25 +451,56 @@ function updateHUD() {
 }
 
 // ============================
-// キー入力
+// タッチボタン制御
+// ============================
+const repeatActions = { left: null, right: null, down: null };
+
+function onBtnDown(action) {
+  if (gameOver) return;
+  doAction(action);
+  if (action === 'left' || action === 'right' || action === 'down') {
+    repeatActions[action] = setInterval(() => doAction(action), 120);
+  }
+}
+
+function onBtnUp(action) {
+  if (repeatActions[action]) { clearInterval(repeatActions[action]); repeatActions[action] = null; }
+}
+
+function doAction(action) {
+  if (gameOver) return;
+  switch(action) {
+    case 'left':  movePair(0,-1); break;
+    case 'right': movePair(0, 1); break;
+    case 'down':  movePair(1, 0); break;
+    case 'rotL':  rotatePair(false); break;
+    case 'rotR':  rotatePair(true);  break;
+    case 'drop':  hardDrop(); break;
+  }
+}
+
+// ============================
+// キーボード（PC兼用）
 // ============================
 document.addEventListener('keydown', e => {
   if (gameOver) return;
   switch(e.key) {
-    case 'ArrowLeft':  e.preventDefault(); movePair(0, -1); break;
-    case 'ArrowRight': e.preventDefault(); movePair(0,  1); break;
-    case 'ArrowDown':  e.preventDefault(); movePair(1,  0); break;
+    case 'ArrowLeft':  e.preventDefault(); movePair(0,-1); break;
+    case 'ArrowRight': e.preventDefault(); movePair(0, 1); break;
+    case 'ArrowDown':  e.preventDefault(); movePair(1, 0); break;
     case 'ArrowUp':
-    case 'z':
-    case 'Z':          e.preventDefault(); rotatePair(); break;
-    case ' ':          e.preventDefault(); hardDrop(); break;
+    case 'z': case 'Z': e.preventDefault(); rotatePair(false); break;
+    case 'x': case 'X': e.preventDefault(); rotatePair(true);  break;
+    case ' ': e.preventDefault(); hardDrop(); break;
   }
 });
+
+window.addEventListener('resize', resizeCanvas);
 
 // ============================
 // スタート
 // ============================
-startGame();
+window.addEventListener('load', startGame);
 </script>
 </body>
 </html>

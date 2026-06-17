@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>ぷよぷよ</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #1a1a2e;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      font-family: 'Segoe UI', sans-serif;
+      color: #fff;
+    }
+
+    #wrapper {
+      display: flex;
+      gap: 24px;
+      align-items: flex-start;
+    }
+
+    #gameCanvas {
+      border: 3px solid #4a4a8a;
+      border-radius: 4px;
+      display: block;
+      background: #0d0d1a;
+    }
+
+    #sidebar {
+      width: 130px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .panel {
+      background: #16213e;
+      border: 2px solid #4a4a8a;
+      border-radius: 8px;
+      padding: 12px;
+      text-align: center;
+    }
+
+    .panel h3 {
+      font-size: 12px;
+      color: #8888cc;
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+    }
+
+    .panel .value {
+      font-size: 28px;
+      font-weight: bold;
+      color: #fff;
+    }
+
+    #nextCanvas {
+      background: #0d0d1a;
+      border-radius: 4px;
+    }
+
+    #message {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0,0,0,0.85);
+      border: 2px solid #6666cc;
+      border-radius: 12px;
+      padding: 32px 40px;
+      text-align: center;
+      display: none;
+      z-index: 10;
+    }
+
+    #message h2 { font-size: 28px; margin-bottom: 12px; }
+    #message p  { color: #aaa; margin-bottom: 20px; }
+
+    #message button {
+      background: #4444aa;
+      color: #fff;
+      border: none;
+      padding: 10px 28px;
+      border-radius: 6px;
+      font-size: 16px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    #message button:hover { background: #6666cc; }
+
+    #controls {
+      background: #16213e;
+      border: 2px solid #4a4a8a;
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 11px;
+      color: #8888cc;
+      line-height: 1.9;
+    }
+    #controls strong { color: #aaaaee; }
+  </style>
+</head>
+<body>
+
+<div id="wrapper">
+  <canvas id="gameCanvas"></canvas>
+
+  <div id="sidebar">
+    <div class="panel">
+      <h3>SCORE</h3>
+      <div class="value" id="scoreDisplay">0</div>
+    </div>
+    <div class="panel">
+      <h3>NEXT</h3>
+      <canvas id="nextCanvas" width="80" height="80"></canvas>
+    </div>
+    <div class="panel">
+      <h3>CHAIN</h3>
+      <div class="value" id="chainDisplay">0</div>
+    </div>
+    <div id="controls">
+      <strong>←→</strong> 移動<br>
+      <strong>↑ / Z</strong> 回転<br>
+      <strong>↓</strong> 高速落下<br>
+      <strong>Space</strong> 即落とし
+    </div>
+  </div>
+</div>
+
+<div id="message">
+  <h2 id="msgTitle">ゲームオーバー</h2>
+  <p id="msgSub">スコア: <span id="finalScore">0</span></p>
+  <button onclick="startGame()">もう一度</button>
+</div>
+
+<script>
+// ============================
+// 定数
+// ============================
+const COLS = 6;
+const ROWS = 13;
+const CELL = 40;
+
+const COLORS = ['#e74c3c','#3498db','#2ecc71','#f39c12','#9b59b6'];
+const COLOR_NAMES = ['赤','青','緑','黄','紫'];
+const EMPTY = -1;
+
+const canvas = document.getElementById('gameCanvas');
+canvas.width  = COLS * CELL;
+canvas.height = ROWS * CELL;
+const ctx = canvas.getContext('2d');
+
+const nextCanvas = document.getElementById('nextCanvas');
+const nCtx = nextCanvas.getContext('2d');
+
+// ============================
+// ゲーム状態
+// ============================
+let board, score, chain, gameOver, dropInterval, currentPair, nextPair, lastTime, accumulator;
+
+// ペアぷよの構造:
+//   { pivot: {r, c, color}, satellite: {r, c, color} }
+//   satellite は pivot の上・右・下・左のどれか（回転で変わる）
+
+function randomColor() { return Math.floor(Math.random() * COLORS.length); }
+
+function newPair() {
+  return {
+    pivot:     { r: 1, c: Math.floor(COLS/2) - 1, color: randomColor() },
+    satellite: { r: 0, c: Math.floor(COLS/2) - 1, color: randomColor() },
+  };
+}
+
+function startGame() {
+  board = Array.from({length: ROWS}, () => new Array(COLS).fill(EMPTY));
+  score = 0;
+  chain = 0;
+  gameOver = false;
+  dropInterval = 800;
+  accumulator = 0;
+  lastTime = null;
+
+  currentPair = newPair();
+  nextPair    = newPair();
+
+  document.getElementById('message').style.display = 'none';
+  updateHUD();
+  requestAnimationFrame(gameLoop);
+}
+
+// ============================
+// ゲームループ
+// ============================
+function gameLoop(timestamp) {
+  if (gameOver) return;
+
+  if (lastTime === null) lastTime = timestamp;
+  const dt = timestamp - lastTime;
+  lastTime = timestamp;
+
+  accumulator += dt;
+  if (accumulator >= dropInterval) {
+    accumulator = 0;
+    if (!movePair(1, 0)) {
+      placePair();
+      return; // placePair が非同期チェーン処理を開始する
+    }
+  }
+
+  draw();
+  requestAnimationFrame(gameLoop);
+}
+
+// ============================
+// 移動・回転
+// ============================
+function movePair(dr, dc) {
+  const np = offsetPair(currentPair, dr, dc);
+  if (isValid(np)) { currentPair = np; draw(); return true; }
+  return false;
+}
+
+function offsetPair(pair, dr, dc) {
+  return {
+    pivot:     { ...pair.pivot,     r: pair.pivot.r     + dr, c: pair.pivot.c     + dc },
+    satellite: { ...pair.satellite, r: pair.satellite.r + dr, c: pair.satellite.c + dc },
+  };
+}
+
+function rotatePair() {
+  // satellite の pivot 相対位置を時計回りに90°回転
+  const dr = currentPair.satellite.r - currentPair.pivot.r;
+  const dc = currentPair.satellite.c - currentPair.pivot.c;
+  // (dr, dc) -> (-dc, dr)  ※時計回り
+  const newDr = dc;   // ←これで反時計回り
+  const newDc = -dr;
+  const np = {
+    pivot: { ...currentPair.pivot },
+    satellite: {
+      r: currentPair.pivot.r + newDr,
+      c: currentPair.pivot.c + newDc,
+      color: currentPair.satellite.color,
+    },
+  };
+  // 壁キック
+  if (!isValid(np)) {
+    const kicked = offsetPair(np, 0, np.satellite.c < 0 ? 1 : -1);
+    if (isValid(kicked)) { currentPair = kicked; } 
+  } else {
+    currentPair = np;
+  }
+  draw();
+}
+
+function hardDrop() {
+  while (movePair(1, 0)) {}
+  placePair();
+}
+
+function isValid(pair) {
+  for (const p of [pair.pivot, pair.satellite]) {
+    if (p.c < 0 || p.c >= COLS) return false;
+    if (p.r >= ROWS) return false;
+    if (p.r >= 0 && board[p.r][p.c] !== EMPTY) return false;
+  }
+  return true;
+}
+
+// ============================
+// 設置
+// ============================
+function placePair() {
+  for (const p of [currentPair.pivot, currentPair.satellite]) {
+    if (p.r < 0) { triggerGameOver(); return; }
+    board[p.r][p.c] = p.color;
+  }
+  chain = 0;
+  draw();
+  processChain();
+}
+
+function triggerGameOver() {
+  gameOver = true;
+  document.getElementById('finalScore').textContent = score;
+  document.getElementById('msgTitle').textContent = 'ゲームオーバー';
+  document.getElementById('message').style.display = 'block';
+}
+
+// ============================
+// 連鎖処理（非同期・アニメーション付き）
+// ============================
+async function processChain() {
+  await applyGravity();
+
+  const groups = findGroups();
+  if (groups.length === 0) {
+    // 連鎖終了
+    spawnNext();
+    return;
+  }
+
+  chain++;
+  const cleared = groups.flat();
+  const bonus = calcBonus(cleared.length, chain);
+  score += bonus;
+  updateHUD();
+
+  // 消去アニメーション
+  await flashCells(cleared);
+
+  // 消去
+  for (const {r, c} of cleared) board[r][c] = EMPTY;
+  draw();
+
+  // 落下
+  await applyGravity();
+
+  // 再帰
+  setTimeout(processChain, 200);
+}
+
+function spawnNext() {
+  currentPair = nextPair;
+  nextPair = newPair();
+  accumulator = 0;
+  lastTime = null;
+  draw();
+  requestAnimationFrame(gameLoop);
+}
+
+async function applyGravity() {
+  // 各列で上から詰める
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (let c = 0; c < COLS; c++) {
+      for (let r = ROWS - 2; r >= 0; r--) {
+        if (board[r][c] !== EMPTY && board[r+1][c] === EMPTY) {
+          board[r+1][c] = board[r][c];
+          board[r][c] = EMPTY;
+          changed = true;
+        }
+      }
+    }
+  }
+  draw();
+  await wait(100);
+}
+
+function findGroups() {
+  const visited = Array.from({length: ROWS}, () => new Array(COLS).fill(false));
+  const groups = [];
+
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      if (board[r][c] !== EMPTY && !visited[r][c]) {
+        const group = [];
+        floodFill(r, c, board[r][c], visited, group);
+        if (group.length >= 4) groups.push(group);
+      }
+    }
+  }
+  return groups;
+}
+
+function floodFill(r, c, color, visited, group) {
+  if (r < 0 || r >= ROWS || c < 0 || c >= COLS) return;
+  if (visited[r][c] || board[r][c] !== color) return;
+  visited[r][c] = true;
+  group.push({r, c});
+  floodFill(r-1, c, color, visited, group);
+  floodFill(r+1, c, color, visited, group);
+  floodFill(r, c-1, color, visited, group);
+  floodFill(r, c+1, color, visited, group);
+}
+
+function calcBonus(count, chainNum) {
+  const base = count * 10;
+  const chainBonus = Math.max(1, chainNum * 3);
+  return base * chainBonus;
+}
+
+// ============================
+// アニメーション補助
+// ============================
+async function flashCells(cells) {
+  for (let i = 0; i < 4; i++) {
+    drawFlash(cells, i % 2 === 0);
+    await wait(80);
+  }
+}
+
+function drawFlash(cells, bright) {
+  draw();
+  for (const {r, c} of cells) {
+    ctx.fillStyle = bright ? '#ffffff' : 'rgba(255,255,255,0.3)';
+    ctx.fillRect(c * CELL + 2, r * CELL + 2, CELL - 4, CELL - 4);
+  }
+}
+
+function wait(ms) { return new Promise(res => setTimeout(res, ms)); }
+
+// ============================
+// 描画
+// ============================
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // グリッド線
+  ctx.strokeStyle = '#1e1e3a';
+  ctx.lineWidth = 1;
+  for (let r = 0; r <= ROWS; r++) {
+    ctx.beginPath(); ctx.moveTo(0, r*CELL); ctx.lineTo(COLS*CELL, r*CELL); ctx.stroke();
+  }
+  for (let c = 0; c <= COLS; c++) {
+    ctx.beginPath(); ctx.moveTo(c*CELL, 0); ctx.lineTo(c*CELL, ROWS*CELL); ctx.stroke();
+  }
+
+  // ボード
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      if (board[r][c] !== EMPTY) drawPuyo(ctx, r, c, board[r][c]);
+    }
+  }
+
+  // 現在のペア
+  if (currentPair && !gameOver) {
+    for (const p of [currentPair.pivot, currentPair.satellite]) {
+      if (p.r >= 0) drawPuyo(ctx, p.r, p.c, p.color);
+    }
+    // ゴースト（落下先）
+    drawGhost();
+  }
+
+  // NEXTキャンバス
+  nCtx.clearRect(0, 0, 80, 80);
+  if (nextPair) {
+    drawPuyoOnCtx(nCtx, 0, 0, nextPair.satellite.color, 40);
+    drawPuyoOnCtx(nCtx, 1, 0, nextPair.pivot.color, 40);
+  }
+}
+
+function drawGhost() {
+  let ghost = {...currentPair,
+    pivot: {...currentPair.pivot},
+    satellite: {...currentPair.satellite}
+  };
+  while (true) {
+    const next = offsetPair(ghost, 1, 0);
+    if (!isValid(next)) break;
+    ghost = next;
+  }
+  for (const p of [ghost.pivot, ghost.satellite]) {
+    if (p.r >= 0) {
+      ctx.save();
+      ctx.globalAlpha = 0.25;
+      drawPuyo(ctx, p.r, p.c, p.color);
+      ctx.restore();
+    }
+  }
+}
+
+function drawPuyo(ctx, r, c, colorIdx) {
+  drawPuyoOnCtx(ctx, r, c, colorIdx, CELL);
+}
+
+function drawPuyoOnCtx(ctx, r, c, colorIdx, size) {
+  const x = c * size + size * 0.1;
+  const y = r * size + size * 0.1;
+  const s = size * 0.8;
+  const rad = s / 2;
+
+  const color = COLORS[colorIdx];
+
+  // 影
+  ctx.save();
+  ctx.shadowColor = color;
+  ctx.shadowBlur = 8;
+
+  // 本体（円）
+  ctx.beginPath();
+  ctx.arc(x + rad, y + rad, rad, 0, Math.PI * 2);
+  const grad = ctx.createRadialGradient(x+rad*0.6, y+rad*0.5, 1, x+rad, y+rad, rad);
+  grad.addColorStop(0, lighten(color, 60));
+  grad.addColorStop(1, color);
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  // ハイライト
+  ctx.beginPath();
+  ctx.arc(x + rad * 0.65, y + rad * 0.5, rad * 0.25, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(255,255,255,0.5)';
+  ctx.fill();
+
+  // 目
+  const eyeY = y + rad * 0.85;
+  ctx.fillStyle = '#222';
+  ctx.beginPath(); ctx.arc(x + rad * 0.72, eyeY, rad * 0.13, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(x + rad * 1.28, eyeY, rad * 0.13, 0, Math.PI * 2); ctx.fill();
+
+  ctx.restore();
+}
+
+function lighten(hex, amount) {
+  const num = parseInt(hex.slice(1), 16);
+  const r = Math.min(255, (num >> 16) + amount);
+  const g = Math.min(255, ((num >> 8) & 0xff) + amount);
+  const b = Math.min(255, (num & 0xff) + amount);
+  return `rgb(${r},${g},${b})`;
+}
+
+function updateHUD() {
+  document.getElementById('scoreDisplay').textContent = score;
+  document.getElementById('chainDisplay').textContent = chain;
+}
+
+// ============================
+// キー入力
+// ============================
+document.addEventListener('keydown', e => {
+  if (gameOver) return;
+  switch(e.key) {
+    case 'ArrowLeft':  e.preventDefault(); movePair(0, -1); break;
+    case 'ArrowRight': e.preventDefault(); movePair(0,  1); break;
+    case 'ArrowDown':  e.preventDefault(); movePair(1,  0); break;
+    case 'ArrowUp':
+    case 'z':
+    case 'Z':          e.preventDefault(); rotatePair(); break;
+    case ' ':          e.preventDefault(); hardDrop(); break;
+  }
+});
+
+// ============================
+// スタート
+// ============================
+startGame();
+</script>
+</body>
+</html>

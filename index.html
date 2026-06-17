@@ -197,7 +197,8 @@ function calcCell() {
   const ctrlH = document.getElementById('controls').offsetHeight || 110;
   const availH = window.innerHeight - topH - ctrlH - 16;
   const availW = window.innerWidth - 8;
-  return Math.floor(Math.min(availW / COLS, availH / ROWS));
+  const cell = Math.floor(Math.min(availW / COLS, availH / ROWS));
+  return Math.max(cell, 24); // 最小24px保証
 }
 
 let CELL = 32;
@@ -206,7 +207,7 @@ function resizeCanvas() {
   CELL = calcCell();
   canvas.width  = COLS * CELL;
   canvas.height = ROWS * CELL;
-  draw();
+  if (board) draw();
 }
 
 // ============================
@@ -395,6 +396,7 @@ function wait(ms) { return new Promise(res=>setTimeout(res,ms)); }
 // 描画
 // ============================
 function draw() {
+  if (!board) return;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.strokeStyle = '#1e1e3a'; ctx.lineWidth = 1;
   for (let r=0;r<=ROWS;r++){ctx.beginPath();ctx.moveTo(0,r*CELL);ctx.lineTo(COLS*CELL,r*CELL);ctx.stroke();}
@@ -500,7 +502,8 @@ window.addEventListener('resize', resizeCanvas);
 // ============================
 // スタート
 // ============================
-window.addEventListener('load', startGame);
+// レイアウトが確定してからスタート（50ms待つことでoffsetHeightが正確に取れる）
+window.addEventListener('load', () => setTimeout(startGame, 50));
 </script>
 </body>
 </html>

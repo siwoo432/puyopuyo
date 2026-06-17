@@ -418,16 +418,17 @@ function draw() {
 function drawGhost() {
   let g = {pivot:{...currentPair.pivot}, satellite:{...currentPair.satellite}};
   while (true) { const n=offsetPair(g,1,0); if(!isValid(n))break; g=n; }
-  ctx.save(); ctx.globalAlpha=0.22;
-  for (const p of [g.pivot,g.satellite]) if(p.r>=0) drawPuyo(ctx,p.r,p.c,p.color,CELL);
-  ctx.restore();
+  // ゴーストが現在位置と同じなら描画不要
+  if (g.pivot.r === currentPair.pivot.r && g.pivot.c === currentPair.pivot.c) return;
+  for (const p of [g.pivot,g.satellite]) if(p.r>=0) drawPuyo(ctx,p.r,p.c,p.color,CELL,0.25);
 }
 
-function drawPuyo(ctx, r, c, colorIdx, size) {
+function drawPuyo(ctx, r, c, colorIdx, size, alpha = 1.0) {
   const x = c*size + size*0.1, y = r*size + size*0.1;
   const rad = size*0.8/2;
   const color = COLORS[colorIdx];
   ctx.save();
+  ctx.globalAlpha = alpha;
   ctx.shadowColor = color; ctx.shadowBlur = 6;
   ctx.beginPath(); ctx.arc(x+rad, y+rad, rad, 0, Math.PI*2);
   const g = ctx.createRadialGradient(x+rad*0.6,y+rad*0.5,1,x+rad,y+rad,rad);
